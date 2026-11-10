@@ -1,0 +1,42 @@
+{
+  "name": "opencode-muse-provider",
+  "version": "0.2.0",
+  "description": "Muse Code subscription provider and OpenCode V2 plugin",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "clean": "node --input-type=module -e \"import { rmSync } from 'node:fs'; rmSync('dist', { recursive: true, force: true });\"",
+    "build": "tsc -p tsconfig.json && bun build src/plugin.ts --target=node --format=esm --external @opencode/plugin --outfile dist/muse-code-1.4.14-r3/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && tsx tests/muse-provider.test.ts && tsx tests/tool-descriptions.test.ts && tsx tests/tool-alias.test.ts",
+    "format": "prettier --write '**/*.{ts,json,md}'",
+    "format:check": "prettier --check '**/*.{ts,json,md}'"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "muse-code",
+    "provider"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@opencode/plugin": "2.0.18",
+    "eventsource-parser": "3.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}
