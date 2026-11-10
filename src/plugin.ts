@@ -18,6 +18,10 @@ const AUTH_PLACEHOLDER = "muse-code-subscription-placeholder";
 
 const SPARK_LIMIT = { context: 1_048_576, output: 131_072 };
 const WONDER_LIMIT = { context: 1_007_997, output: 128_000 };
+// Muse Ember 1.0 advertises 524,288 output tokens in the public docs; the
+// plugin conservatively mirrors the Spark configured cap until the Muse Code
+// subscription catalog is verified for Ember.
+const EMBER_LIMIT = SPARK_LIMIT;
 
 type ReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 type MaxReasoningEffort = "xhigh" | "max";
@@ -44,6 +48,20 @@ const MODELS: readonly MuseModelSpec[] = [
     limit: SPARK_LIMIT,
     defaultEffort: "low",
     maxEffort: "xhigh",
+  },
+  {
+    id: "muse-ember-1.0",
+    name: "Muse Ember 1.0",
+    limit: EMBER_LIMIT,
+    defaultEffort: "low",
+    maxEffort: "max",
+  },
+  {
+    id: "muse-ember-1.0-contributor",
+    name: "Muse Ember 1.0 Contributor",
+    limit: EMBER_LIMIT,
+    defaultEffort: "low",
+    maxEffort: "max",
   },
   {
     id: "muse-wonder-1.0",
