@@ -426,6 +426,38 @@ async function testV2ProviderRegistration(plugin: typeof sourceMusePlugin) {
       ],
     },
     {
+      id: "muse-ember-1.0",
+      name: "Muse Ember 1.0",
+      limit: { context: 1_048_576, output: 131_072 },
+      defaultEffort: "low",
+      variants: [
+        ["none", "minimal"],
+        ["minimal", "minimal"],
+        ["low", "low"],
+        ["medium", "medium"],
+        ["high", "high"],
+        ["xhigh", "xhigh"],
+        ["max", "max"],
+        ["ultra", "max"],
+      ],
+    },
+    {
+      id: "muse-ember-1.0-contributor",
+      name: "Muse Ember 1.0 Contributor",
+      limit: { context: 1_048_576, output: 131_072 },
+      defaultEffort: "low",
+      variants: [
+        ["none", "minimal"],
+        ["minimal", "minimal"],
+        ["low", "low"],
+        ["medium", "medium"],
+        ["high", "high"],
+        ["xhigh", "xhigh"],
+        ["max", "max"],
+        ["ultra", "max"],
+      ],
+    },
+    {
       id: "muse-wonder-1.0",
       name: "Muse Wonder 1.0",
       limit: { context: 1_007_997, output: 128_000 },
@@ -491,12 +523,12 @@ async function testV2ProviderRegistration(plugin: typeof sourceMusePlugin) {
     },
   ];
 
-  assert.equal(provider.models.length, 6);
+  assert.equal(provider.models.length, 8);
   assert.deepEqual(
     provider.models.map(({ id }) => id),
     expectedModels.map(({ id }) => id),
   );
-  assert.equal(new Set(provider.models.map(({ id }) => id)).size, 6);
+  assert.equal(new Set(provider.models.map(({ id }) => id)).size, 8);
 
   for (const model of provider.models) {
     const expected = expectedModels.find(({ id }) => id === model.id);
@@ -607,6 +639,8 @@ async function testExistingProviderModelsArePreserved() {
     [
       "muse-spark-1.2-contributor",
       "muse-spark-1.3-contributor",
+      "muse-ember-1.0",
+      "muse-ember-1.0-contributor",
       "muse-wonder-1.0",
       "muse-wonder-1.0-contributor",
       "muse-wonder-full-1.0",
@@ -652,7 +686,8 @@ async function testCollidingBuiltinOverrideIsPreservedOnce() {
   const first = await captureRegistration(sourceMusePlugin, existing);
   assert.deepEqual(first.provider.models[0], collidingOverride);
   assert.deepEqual(first.provider.models[1], unrelatedModel);
-  assert.equal(first.provider.models.length, 7);
+  // 2 user models + 8 built-ins minus the 1 colliding wonder entry.
+  assert.equal(first.provider.models.length, 9);
   assert.deepEqual(
     first.provider.models.map(({ id }) => id),
     [
@@ -660,6 +695,8 @@ async function testCollidingBuiltinOverrideIsPreservedOnce() {
       "user-defined-model",
       "muse-spark-1.2-contributor",
       "muse-spark-1.3-contributor",
+      "muse-ember-1.0",
+      "muse-ember-1.0-contributor",
       "muse-wonder-1.0-contributor",
       "muse-wonder-full-1.0",
       "muse-wonder-full-1.0-contributor",
@@ -671,7 +708,7 @@ async function testCollidingBuiltinOverrideIsPreservedOnce() {
   );
 
   const second = await captureRegistration(sourceMusePlugin, first.provider);
-  assert.equal(second.provider.models.length, 7);
+  assert.equal(second.provider.models.length, 9);
   assert.deepEqual(
     second.provider.models.map(({ id }) => id),
     first.provider.models.map(({ id }) => id),
@@ -688,7 +725,7 @@ async function testNativeImageToolEffortAndSummaryRequests(
   plugin: typeof sourceMusePlugin,
 ) {
   const { provider, hooks } = await captureRegistration(plugin);
-  assert.equal(provider.models.length, 6);
+  assert.equal(provider.models.length, 8);
   const hook = hooks[0];
   assert(hook);
   const configDirectory = await mkdtemp(
@@ -704,14 +741,15 @@ async function testNativeImageToolEffortAndSummaryRequests(
     required: ["color"],
     additionalProperties: false,
   };
-  // Independent oracle for the decided variant mapping: Spark caps at xhigh,
-  // Wonder caps at max. Mirrors the registration table without calling it.
+  // Independent oracle for the decided variant mapping: Spark caps at xhigh;
+  // Ember and Wonder cap at max. Mirrors the registration table without calling it.
   function expectedEffortFor(
     modelID: string,
     variantID: string | undefined,
   ): string {
     const isSpark = modelID.startsWith("muse-spark-");
-    if (variantID === undefined) return isSpark ? "low" : "medium";
+    const isEmber = modelID.startsWith("muse-ember-");
+    if (variantID === undefined) return isSpark || isEmber ? "low" : "medium";
     switch (variantID) {
       case "none":
       case "minimal":

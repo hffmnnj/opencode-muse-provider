@@ -1,7 +1,7 @@
 # Muse Code provider for OpenCode V2
 
-This package is an OpenCode V2 plugin for Muse Code. It registers Muse Spark
-and Muse Wonder models on Meta's Responses API using OpenCode's native Meta Responses provider.
+This package is an OpenCode V2 plugin for Muse Code. It registers Muse Spark,
+Muse Ember and Muse Wonder models on Meta's Responses API using OpenCode's native Meta Responses provider.
 Request construction and streaming are delegated to the native V2 provider.
 
 ## Install
@@ -34,6 +34,7 @@ that project.
 V2 registers these models at runtime, so they do not need entries under
 `providers` in `opencode.json`. Open the V2 model selector with `/models` and
 choose a `muse/...` entry such as `muse/muse-spark-1.3-contributor`,
+`muse/muse-ember-1.0`, `muse/muse-ember-1.0-contributor`,
 `muse/muse-wonder-1.0`, `muse/muse-wonder-1.0-contributor`,
 `muse/muse-wonder-full-1.0`, or `muse/muse-wonder-full-1.0-contributor`.
 Registering a model does not change the configured default. If your machine has separate V1 and V2
@@ -41,17 +42,21 @@ executables, launch V2; this plugin is intentionally V2-only.
 
 ## Models and reasoning
 
-The plugin registers six subscription models: `muse-spark-1.2-contributor`,
-`muse-spark-1.3-contributor`, `muse-wonder-1.0`,
+The plugin registers eight subscription models: `muse-spark-1.2-contributor`,
+`muse-spark-1.3-contributor`, `muse-ember-1.0`, `muse-ember-1.0-contributor`,
+`muse-wonder-1.0`,
 `muse-wonder-1.0-contributor`, `muse-wonder-full-1.0`, and
-`muse-wonder-full-1.0-contributor`. All six advertise text and image input plus text output with tool use.
+`muse-wonder-full-1.0-contributor`. All eight advertise text and image input plus text output with tool use.
 Image support means image input natively (PNG/JPEG/GIF/WebP via OpenCode attachments → input_image);
 it is not image generation. Only text plus image input and text output are advertised.
 Structured outputs are not advertised because their behavior has not been
 verified against the Muse endpoint. Meta documents parallel tool calling, but
 the plugin does not claim end-to-end parallel tool handling by OpenCode.
-Spark retains the plugin's existing configured limits (1,048,576-token context window and 131,072-token output limit).
+Spark and Ember retain the plugin's configured limits (1,048,576-token context window and 131,072-token output limit).
+The public Muse Ember docs advertise a 524,288-token maximum output, but the effective Muse Code subscription-catalog
+limits for `muse-ember-1.0` were not verified when it was added; the plugin conservatively mirrors the Spark cap.
 Meta's [model documentation](https://dev.meta.ai/docs/models) describes the model families and subscription availability.
+Both Ember IDs were exercised live with Minimal reasoning through `muse exec` before registration.
 The Wonder limits (1,007,997-token context and 128,000-token output) are the effective
 Muse Code CLI catalog limits for these subscription IDs; they are not claimed as a separate
 undocumented 131,072-token Wonder API ceiling. The public model docs do not list the
@@ -59,8 +64,13 @@ Contributor subscription IDs, so the installed Muse Code catalog is the source f
 subscription IDs and their effective limits (verified with Muse Code 1.4.6's provider catalog).
 Muse Wonder Full 1.0 models require a Power or Maximum plan. Contributor models
 (`muse-spark-1.2-contributor`, `muse-spark-1.3-contributor`,
+`muse-ember-1.0-contributor`,
 `muse-wonder-1.0-contributor`, and `muse-wonder-full-1.0-contributor`) carry the catalog
 data-use notice: your content, including inter-session messages, may be used for product improvement.
+The public model docs describe Muse Ember as Standard-mode only with no Contributor variant; the
+`muse-ember-1.0-contributor` subscription ID is not listed there but was verified working with
+`muse exec` on a Muse Code subscription (Muse Code 1.4.14) on 2026-11-09, the same way the Spark
+Contributor IDs are catalog subscription variants.
 Select a reasoning variant with `#variant`, for example:
 
 ```text
@@ -69,11 +79,11 @@ muse/muse-wonder-1.0#high
 ```
 
 Available selectors are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`,
-`max`, and `ultra` for both families. The default is `low` for Spark and `medium` for Wonder
+`max`, and `ultra` for all families. The default is `low` for Spark and Ember and `medium` for Wonder
 when no variant is selected.
 The Meta Responses API does not support disabling reasoning, so `none` maps to the API's minimum
 `minimal` effort for all models. Spark Contributor `max`/`ultra` map to `xhigh`, the highest documented
-Contributor effort, while all Wonder `max`/`ultra` map to `max`. See Meta's [reasoning documentation](https://dev.meta.ai/docs/reasoning).
+Contributor effort, while Ember and Wonder `max`/`ultra` map to `max`. See Meta's [reasoning documentation](https://dev.meta.ai/docs/reasoning).
 
 The plugin requests human-readable reasoning summaries automatically
 (`reasoning.summary: "auto"`) for its registered models. Summaries are separate from the
