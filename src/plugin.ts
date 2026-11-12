@@ -1,5 +1,8 @@
 import { Model, Plugin, Provider } from "@opencode/plugin";
-import { resolveMuseSubscriptionKey } from "./auth.js";
+import {
+  invalidateMuseSubscriptionKeys,
+  resolveMuseSubscriptionKey,
+} from "./auth.js";
 import { maskMuseToolDescriptions } from "./tool-descriptions.js";
 import {
   prepareMuseToolRequest,
@@ -257,6 +260,10 @@ export default Plugin.define({
     await ctx.session.hook(
       "http.response",
       async (event) => {
+        if (event.response.status === 401 || event.response.status === 403) {
+          // Re-mint on the next request instead of reusing a rejected key.
+          invalidateMuseSubscriptionKeys();
+        }
         event.response = await restoreMuseToolResponse(event.response);
       },
       { providerID: PROVIDER_ID },
