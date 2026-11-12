@@ -53,6 +53,55 @@ function parseJson(text: string): unknown {
   }
 }
 
+function selectedFunctionNames(choice: JsonObject): Set<string> {
+  const names = new Set<string>();
+  if (choice.type === "function" && typeof choice.name === "string") {
+    names.add(choice.name);
+  }
+  if (choice.type === "allowed_tools" && Array.isArray(choice.tools)) {
+    for (const tool of choice.tools) {
+      if (
+        object(tool) &&
+        tool.type === "function" &&
+        typeof tool.name === "string"
+      ) {
+        names.add(tool.name);
+      }
+    }
+  }
+  return names;
+}
+
+/**
+ * Muse rejects every `tool_choice` except "auto" ("none", "required", named
+ * function and allowed_tools are all HTTP 400). OpenCode sends "none" on the
+ * final step of an agent's step budget and a named function for structured
+ * output, so degrade them instead of failing the whole turn. A named or
+ * allowed selection is approximated by narrowing the function tools; tools stay
+ * declared for "none" so earlier function_call history remains valid and the
+ * disabled-tool case is still handled by OpenCode when the model calls one.
+ */
+function restrictToolChoiceToAuto(value: JsonObject): boolean {
+  const choice = value.tool_choice;
+  if (choice === undefined || choice === null || choice === "auto") {
+    return false;
+  }
+
+  if (object(choice) && Array.isArray(value.tools)) {
+    const names = selectedFunctionNames(choice);
+    if (names.size > 0) {
+      value.tools = value.tools.filter(
+        (tool: unknown) =>
+          !object(tool) ||
+          tool.type !== "function" ||
+          names.has(tool.name as string),
+      );
+    }
+  }
+  value.tool_choice = "auto";
+  return true;
+}
+
 export async function prepareMuseToolRequest(
   request: Request,
 ): Promise<Request> {
@@ -107,6 +156,7 @@ export async function prepareMuseToolRequest(
       }
     }
   }
+  changed = restrictToolChoiceToAuto(value) || changed;
   if (!changed) return request;
   const headers = new Headers(request.headers);
   headers.delete("content-length");

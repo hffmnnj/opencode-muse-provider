@@ -54,7 +54,7 @@ async function main() {
   const expected = structuredClone(payload);
   expected.tools[0]!.name = MUSE_SHELL_ALIAS;
   expected.input[1]!.name = MUSE_SHELL_ALIAS;
-  expected.tool_choice.tools[0]!.name = MUSE_SHELL_ALIAS;
+  (expected as { tool_choice: unknown }).tool_choice = "auto";
   assert.deepEqual(await prepared.json(), expected);
   assert.equal(prepared.headers.get("content-length"), null);
   assert.equal(prepared.headers.get("x-test"), "kept");
@@ -66,8 +66,53 @@ async function main() {
     body: JSON.stringify({ tool_choice: { type: "function", name: "shell" } }),
   });
   assert.deepEqual(await (await prepareMuseToolRequest(selector)).json(), {
-    tool_choice: { type: "function", name: MUSE_SHELL_ALIAS },
+    tool_choice: "auto",
   });
+
+  // Muse only accepts tool_choice "auto"; OpenCode sends "none" on the last
+  // step of an agent's step budget and a named function for structured output.
+  const tools = [
+    { type: "function", name: "shell" },
+    { type: "function", name: "read" },
+    { type: "web_search" },
+  ];
+  const choose = async (toolChoice: unknown) =>
+    (
+      await prepareMuseToolRequest(
+        new Request("https://example.test/", {
+          method: "POST",
+          body: JSON.stringify({ tools, tool_choice: toolChoice }),
+        }),
+      )
+    ).json();
+  const declared = [
+    { type: "function", name: MUSE_SHELL_ALIAS },
+    { type: "function", name: "read" },
+    { type: "web_search" },
+  ];
+  for (const toolChoice of ["none", "required", { type: "none" }]) {
+    assert.deepEqual(await choose(toolChoice), {
+      tools: declared,
+      tool_choice: "auto",
+    });
+  }
+  assert.deepEqual(await choose({ type: "function", name: "read" }), {
+    tools: [declared[1], declared[2]],
+    tool_choice: "auto",
+  });
+  assert.deepEqual(
+    await choose({
+      type: "allowed_tools",
+      mode: "required",
+      tools: [{ type: "function", name: "shell" }],
+    }),
+    { tools: [declared[0], declared[2]], tool_choice: "auto" },
+  );
+  const alreadyAuto = new Request("https://example.test/", {
+    method: "POST",
+    body: JSON.stringify({ tools: [], tool_choice: "auto" }),
+  });
+  assert.equal(await prepareMuseToolRequest(alreadyAuto), alreadyAuto);
   const abortController = new AbortController();
   const abortRequest = new Request("https://example.test/", {
     method: "POST",
