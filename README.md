@@ -139,6 +139,12 @@ Mint and model destinations remain restricted to the trusted Meta endpoints;
 redirects from the mint endpoint are refused. An expired OAuth login, inactive
 subscription, or mint failure never silently falls back to API-key billing.
 
+The mint call is retried up to three times for transient failures (network
+errors such as `ECONNRESET`, timeouts, HTTP 408/425/429/5xx), and the final error
+names the sanitized cause, for example `(ECONNRESET)` or `(HTTP 503)`. A minted
+key is cached in memory for five minutes and shared by concurrent sessions; the
+cache is dropped when the model API answers 401 or 403.
+
 The native Meta Responses adapter requires an API-key value during request
 construction. The plugin supplies a non-secret placeholder to satisfy that
 check, then replaces it with the Muse Code subscription credential in the
@@ -164,9 +170,9 @@ npm run format:check
 output. The plugin itself uses the V2 API from `@opencode/plugin`.
 
 The build also produces a self-contained local runtime at
-`dist/muse-code-1.4.14-r3/server.js`. To activate this build in a long-running
+`dist/muse-code-1.4.14-r4/server.js`. To activate this build in a long-running
 OpenCode server without reusing previously imported modules, register the
-`dist/muse-code-1.4.14-r3` directory as the local plugin. OpenCode requires a
+`dist/muse-code-1.4.14-r4` directory as the local plugin. OpenCode requires a
 directory here, not the path to `server.js`. A configuration reload does not
 invalidate JavaScript's module cache; use a new runtime directory for a later
 code revision that must be activated in the same server process.

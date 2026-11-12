@@ -14,11 +14,15 @@ import { protocol } from "@opencode/ai/protocols/meta-responses";
 import { responses } from "@opencode/ai/providers/meta";
 import sourceMusePlugin from "../src/plugin.js";
 import builtMusePlugin from "../dist/index.js";
-import { museAuthPath, resolveMuseSubscriptionKey } from "../src/auth.js";
+import {
+  invalidateMuseSubscriptionKeys,
+  museAuthPath,
+  resolveMuseSubscriptionKey,
+} from "../src/auth.js";
 import type { MuseToolMap } from "../src/tool-descriptions.js";
 
 const runtimeEntrypoint = new URL(
-  "../dist/muse-code-1.4.14-r3/server.js",
+  "../dist/muse-code-1.4.14-r4/server.js",
   import.meta.url,
 ).href;
 const { default: runtimeMusePlugin } = (await import(runtimeEntrypoint)) as {
@@ -378,6 +382,86 @@ async function testMintFailuresDoNotFallBackOrLeakCredentials() {
       );
     }
   } finally {
+    await removeFixtureDirectory(configDirectory);
+  }
+}
+
+async function testMintRetriesCachesAndReportsCause() {
+  const configDirectory = await mkdtemp(
+    join(testBaseDirectory, "muse-mint-resilience-"),
+  );
+  const authPath = await writeSubscriptionAuth(configDirectory);
+  try {
+    // A stale pooled socket (ECONNRESET) and a 503 are retried, then succeed.
+    const responses: Array<() => Response> = [
+      () => {
+        throw Object.assign(new TypeError("fetch failed"), {
+          cause: { code: "ECONNRESET" },
+        });
+      },
+      () => new Response("unavailable", { status: 503 }),
+      () => Response.json({ is_subs_active: true, api_key: mintedKey }),
+    ];
+    let calls = 0;
+    const flaky = mintFetch(() => responses[calls++]!());
+    const [first, second] = await Promise.all([
+      resolveMuseSubscriptionKey({ authPath, fetch: flaky, retryDelayMs: 0 }),
+      resolveMuseSubscriptionKey({ authPath, fetch: flaky, retryDelayMs: 0 }),
+    ]);
+    assert.equal(first, mintedKey);
+    assert.equal(second, mintedKey);
+    assert.equal(calls, 3, "concurrent callers must share one retried mint");
+
+    const noMint: typeof fetch = async () => assert.fail("cache must serve");
+    assert.equal(
+      await resolveMuseSubscriptionKey({ authPath, fetch: noMint }),
+      mintedKey,
+    );
+
+    invalidateMuseSubscriptionKeys();
+    calls = 0;
+    responses.splice(0, responses.length, () =>
+      Response.json({ is_subs_active: true, api_key: "rotated-key" }),
+    );
+    assert.equal(
+      await resolveMuseSubscriptionKey({ authPath, fetch: flaky }),
+      "rotated-key",
+    );
+    invalidateMuseSubscriptionKeys();
+
+    // Exhausted retries name the sanitized cause, never the raw message.
+    let attempts = 0;
+    await assert.rejects(
+      resolveMuseSubscriptionKey({
+        authPath,
+        retryDelayMs: 0,
+        fetch: mintFetch(() => {
+          attempts++;
+          throw Object.assign(new Error(oauthToken), {
+            cause: { code: "ECONNRESET" },
+          });
+        }),
+      }),
+      (error: unknown) =>
+        error instanceof Error &&
+        /\(ECONNRESET\)/.test(error.message) &&
+        !error.message.includes(oauthToken),
+    );
+    assert.equal(attempts, 3);
+
+    // Caller cancellation is surfaced as cancellation, not as a mint failure.
+    const controller = new AbortController();
+    controller.abort();
+    await assert.rejects(
+      resolveMuseSubscriptionKey({
+        authPath,
+        fetch: noMint,
+        signal: controller.signal,
+      }),
+      { name: "AbortError" },
+    );
+  } finally {
+    invalidateMuseSubscriptionKeys();
     await removeFixtureDirectory(configDirectory);
   }
 }
@@ -1356,6 +1440,7 @@ await testAuthResolution();
 await testMissingAuthIsSafe();
 await testApiKeyOnlyLoginIsNotTreatedAsSubscription();
 await testMintFailuresDoNotFallBackOrLeakCredentials();
+await testMintRetriesCachesAndReportsCause();
 await testV2ProviderRegistration(sourceMusePlugin);
 await testV2ProviderRegistration(builtMusePlugin);
 await testV2ProviderRegistration(runtimeMusePlugin);
