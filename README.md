@@ -1,4 +1,4 @@
-![Muse Provider: a conduit for creative work](assets/banner.png)
+![Muse Code provider for OpenCode, featuring Meta's logo and the Spark, Ember and Wonder model families](assets/banner.png)
 
 # Muse Code provider for OpenCode V2
 
