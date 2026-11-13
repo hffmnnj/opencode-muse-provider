@@ -1,3 +1,5 @@
+![Muse Provider: a conduit for creative work](assets/banner.png)
+
 # Muse Code provider for OpenCode V2
 
 This package is an OpenCode V2 plugin for Muse Code. It registers Muse Spark,
