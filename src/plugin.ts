@@ -4,6 +4,7 @@ import {
   resolveMuseSubscriptionKey,
 } from "./auth.js";
 import { maskMuseToolDescriptions } from "./tool-descriptions.js";
+import { prepareMuseContributorRequest } from "./contributor.js";
 import {
   prepareMuseToolRequest,
   restoreMuseToolResponse,
@@ -239,6 +240,7 @@ export default Plugin.define({
       "http.request",
       async (event) => {
         await addMuseRequestHeaders(event.request);
+        event.request = await prepareMuseContributorRequest(event.request);
         event.request = new Request(
           await prepareMuseToolRequest(event.request),
           {
