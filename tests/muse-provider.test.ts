@@ -977,10 +977,11 @@ async function testNativeImageToolEffortAndSummaryRequests(
               httpRequest.headers.get("authorization"),
               `Bearer ${mintedKey}`,
             );
-            assert.deepEqual(
-              await event.request.json(),
-              JSON.parse(JSON.stringify(body)),
-            );
+            const expectedWire = JSON.parse(JSON.stringify(body));
+            if (registered.id === "muse-ember-1.0-contributor") {
+              expectedWire.model = "muse-ember-1.0";
+            }
+            assert.deepEqual(await event.request.json(), expectedWire);
           }
         }
       },
@@ -1366,6 +1367,47 @@ async function testSubscriptionAuthReplacesConfiguredApiKey() {
   }
 }
 
+async function testContributorModeAndWireModel() {
+  const configDirectory = await mkdtemp(
+    join(testBaseDirectory, "muse-contributor-"),
+  );
+  await writeSubscriptionAuth(configDirectory);
+  try {
+    await withEnvironment(
+      { XDG_CONFIG_HOME: configDirectory },
+      async () => {
+        const { hooks } = await captureRegistration(sourceMusePlugin);
+        const httpHook = hooks.find(({ event }) => event === "http.request");
+        assert(httpHook);
+
+        for (const [model, wireModel, header] of [
+          ["muse-spark-1.3-contributor", "muse-spark-1.3-contributor", "1"],
+          ["muse-ember-1.0-contributor", "muse-ember-1.0", "1"],
+          ["muse-ember-1.0", "muse-ember-1.0", null],
+        ] as const) {
+          const event = {
+            request: new Request("https://api.meta.ai/v1/responses", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ model, input: [] }),
+            }),
+          };
+          await httpHook.handler(event);
+          const outbound = await event.request.json();
+          assert.equal(outbound.model, wireModel, `wire model for ${model}`);
+          assert.equal(
+            event.request.headers.get("x-tbh-contributor-mode"),
+            header,
+            `contributor header for ${model}`,
+          );
+        }
+      },
+    );
+  } finally {
+    await removeFixtureDirectory(configDirectory);
+  }
+}
+
 async function testRequestHookRejectsUntrustedEndpoint() {
   const configDirectory = await mkdtemp(
     join(testBaseDirectory, "muse-untrusted-endpoint-"),
@@ -1458,6 +1500,7 @@ await testRequestHookAddsMuseAuthAndHeaders(sourceMusePlugin);
 await testRequestHookAddsMuseAuthAndHeaders(builtMusePlugin);
 await testRequestHookAddsMuseAuthAndHeaders(runtimeMusePlugin);
 await testSubscriptionAuthReplacesConfiguredApiKey();
+await testContributorModeAndWireModel();
 await testRequestHookRejectsUntrustedEndpoint();
 await testMissingKeyFailsWithoutLeakingCredentials();
 await testEarlyV2PreviewFailsClearly();
@@ -1472,4 +1515,5 @@ console.log(
   "ok - Meta reasoning summary stream yields readable reasoning without duplication",
 );
 console.log("ok - request hook adds credentials only to the Muse endpoint");
+console.log("ok - contributor header and Ember wire model override");
 console.log("ok - unsupported early V2 preview fails with an upgrade hint");

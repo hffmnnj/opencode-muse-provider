@@ -69,10 +69,14 @@ Muse Wonder Full 1.0 models require a Power or Maximum plan. Contributor models
 `muse-ember-1.0-contributor`,
 `muse-wonder-1.0-contributor`, and `muse-wonder-full-1.0-contributor`) carry the catalog
 data-use notice: your content, including inter-session messages, may be used for product improvement.
-The public model docs describe Muse Ember as Standard-mode only with no Contributor variant; the
-`muse-ember-1.0-contributor` subscription ID is not listed there but was verified working with
-`muse exec` on a Muse Code subscription (Muse Code 1.4.14) on 2026-11-09, the same way the Spark
-Contributor IDs are catalog subscription variants.
+Requests selected with a `-contributor` ID send `x-tbh-contributor-mode: 1`, matching the Muse CLI's
+contributor-mode flag. Standard model IDs never send that header.
+The public model docs describe Muse Ember as Standard-mode only with no Contributor variant. The
+`muse-ember-1.0-contributor` ID was initially reported as verified from `muse exec` output, but the
+CLI silently falls back to `muse-ember-1.0` when that ID is absent from the subscription catalog. As
+of Muse Code 1.4.25 neither `/muse-code/models` nor `/v1/models` lists an Ember Contributor model,
+and a direct `muse-ember-1.0-contributor` request returns 404. The plugin keeps the OpenCode ID for
+compatibility but sends `muse-ember-1.0` on the wire for it.
 Select a reasoning variant with `#variant`, for example:
 
 ```text
